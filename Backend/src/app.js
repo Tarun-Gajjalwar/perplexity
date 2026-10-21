@@ -7,15 +7,36 @@ import cors from "cors";
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan("dev"));
+
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://perplexity-red.vercel.app",
+    process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-    origin: "http://localhost:5173",
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (
+            allowedOrigins.includes(origin) ||
+            origin.endsWith(".vercel.app") ||
+            origin.includes("localhost")
+        ) {
+            return callback(null, true);
+        }
+        return callback(null, true);
+    },
     credentials: true,
-    methods: [ "GET", "POST", "PUT", "DELETE" ],
+    methods: [ "GET", "POST", "PUT", "DELETE", "OPTIONS" ],
+    allowedHeaders: [ "Content-Type", "Authorization", "Cookie" ],
 }))
 
 // Health check
