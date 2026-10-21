@@ -25,11 +25,15 @@ export function useAuth() {
 
     async function handleLogin({ email, password }) {
         try {
+            dispatch(setError(null))
             dispatch(setLoading(true))
             const data = await login({ email, password })
             dispatch(setUser(data.user))
+            return { success: true, data }
         } catch (err) {
-            dispatch(setError(err.response?.data?.message || "Login failed"))
+            const errorMsg = err.response?.data?.message || "Login failed"
+            dispatch(setError(errorMsg))
+            return { success: false, error: errorMsg }
         } finally {
             dispatch(setLoading(false))
         }
@@ -41,7 +45,8 @@ export function useAuth() {
             const data = await getMe()
             dispatch(setUser(data.user))
         } catch (err) {
-            dispatch(setError(err.response?.data?.message || "Failed to fetch user data"))
+            // Unauthenticated guest user - clear user without setting error banner
+            dispatch(setUser(null))
         } finally {
             dispatch(setLoading(false))
         }

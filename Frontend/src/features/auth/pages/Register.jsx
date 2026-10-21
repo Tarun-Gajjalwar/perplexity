@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../hook/useAuth'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
+import { setError } from '../auth.slice'
 
 const Register = () => {
   const [username, setUsername] = useState('')
@@ -9,9 +10,14 @@ const Register = () => {
   const [password, setPassword] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
+  const dispatch = useDispatch()
   const { handleRegister } = useAuth()
   const loading = useSelector((state) => state.auth.loading)
   const error = useSelector((state) => state.auth.error)
+
+  useEffect(() => {
+    dispatch(setError(null))
+  }, [dispatch])
 
   const submitForm = async (event) => {
     event.preventDefault()
@@ -25,7 +31,7 @@ const Register = () => {
 
     const res = await handleRegister(payload)
     if (res?.success) {
-      setSuccessMessage('Registration successful! Please check your email to verify your account before logging in.')
+      setSuccessMessage(res.data?.message || 'Registration successful! You can now proceed to login.')
       setUsername('')
       setEmail('')
       setPassword('')

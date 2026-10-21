@@ -1,14 +1,16 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../hook/useAuth'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
 import { Navigate } from 'react-router'
+import { setError } from '../auth.slice'
 
 
 const Login = () => {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
 
+    const dispatch = useDispatch()
     const user = useSelector(state => state.auth.user)
     const loading = useSelector(state => state.auth.loading)
     const error = useSelector(state => state.auth.error)
@@ -16,6 +18,10 @@ const Login = () => {
     const { handleLogin } = useAuth()
 
     const navigate = useNavigate()
+
+    useEffect(() => {
+        dispatch(setError(null))
+    }, [dispatch])
 
     const submitForm = async (event) => {
         event.preventDefault()
@@ -25,8 +31,10 @@ const Login = () => {
             password,
         }
 
-        await handleLogin(payload)
-        navigate("/")
+        const res = await handleLogin(payload)
+        if (res?.success) {
+            navigate("/")
+        }
 
     }
 

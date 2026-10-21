@@ -10,54 +10,79 @@ import { sendEmail } from "../services/mail.service.js";
  * @body { username, email, password }
  */
 export async function register(req, res) {
+    try {
+        const { username, email, password } = req.body;
 
-    const { username, email, password } = req.body;
-
-    const isUserAlreadyExists = await userModel.findOne({
-        $or: [{ email }, { username }]
-    })
-
-    if (isUserAlreadyExists) {
-        return res.status(400).json({
-            message: "User with this email or username already exists",
-            success: false,
-            err: "User already exists"
+        const isUserAlreadyExists = await userModel.findOne({
+            $or: [{ email }, { username }]
         })
-    }
 
-    const user = await userModel.create({ username, email, password })
-
-    const emailVerificationToken = jwt.sign({
-        email: user.email,
-    }, process.env.JWT_SECRET)
-
-    const backendUrl = process.env.BACKEND_URL || "https://perplexity-backend-n6u5.onrender.com";
-
-    await sendEmail({
-        to: email,
-        subject: "Welcome to Perplexity!",
-        html: `
-                <p>Hi ${username},</p>
-                <p>Thank you for registering at <strong>Perplexity</strong>. We're excited to have you on board!</p>
-                <p>Please verify your email address by clicking the link below:</p>
-                <a href="${backendUrl}/api/auth/verify-email?token=${emailVerificationToken}">Verify Email</a>
-                <p>If you did not create an account, please ignore this email.</p>
-                <p>Best regards,<br>The Perplexity Team</p>
-        `
-    })
-
-    res.status(201).json({
-        message: "User registered successfully",
-        success: true,
-        user: {
-            id: user._id,
-            username: user.username,
-            email: user.email
+        if (isUserAlreadyExists) {
+            return res.status(400).json({
+                message: "User with this email or username already exists",
+                success: false,
+                err: "User already exists"
+            })
         }
-    });
 
+        const user = await userModel.create({ username, email, password })
 
+        const emailVerificationToken = jwt.sign({
+            email: user.email,
+        }, process.env.JWT_SECRET)
 
+        const backendUrl = process.env.BACKEND_URL || "https://perplexity-backend-n6u5.onrender.com";
+
+        let emailSent = false;
+        try {
+            if (process.env.GOOGLE_USER && process.env.GOOGLE_REFRESH_TOKEN) {
+                await Promise.race([
+                    sendEmail({
+                        to: email,
+                        subject: "Welcome to Perplexity!",
+                        html: `
+                                <p>Hi ${username},</p>
+                                <p>Thank you for registering at <strong>Perplexity</strong>. We're excited to have you on board!</p>
+                                <p>Please verify your email address by clicking the link below:</p>
+                                <a href="${backendUrl}/api/auth/verify-email?token=${emailVerificationToken}">Verify Email</a>
+                                <p>If you did not create an account, please ignore this email.</p>
+                                <p>Best regards,<br>The Perplexity Team</p>
+                        `
+                    }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Email timeout")), 5000))
+                ]);
+                emailSent = true;
+            }
+        } catch (emailErr) {
+            console.error("Email sending failed or timed out:", emailErr.message);
+        }
+
+        // If email could not be sent (e.g. credentials missing or timed out), auto-verify user so they can log in
+        if (!emailSent) {
+            user.verified = true;
+            await user.save();
+        }
+
+        return res.status(201).json({
+            message: emailSent
+                ? "User registered successfully! Please check your email to verify your account."
+                : "User registered successfully! You can now log in.",
+            success: true,
+            verified: user.verified,
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email
+            }
+        });
+    } catch (err) {
+        console.error("Registration error:", err);
+        return res.status(500).json({
+            message: err.message || "Registration failed",
+            success: false,
+            err: err.message
+        });
+    }
 }
 
 /**
